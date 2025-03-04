@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>愿意和我在一起吗？</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #ffd1dc;
+            font-family: Arial, sans-serif;
+        }
+
+        .container {
+            text-align: center;
+        }
+
+        img {
+            width: 200px;
+            margin-bottom: 20px;
+        }
+
+        h1 {
+            color: #ff69b4;
+            margin-bottom: 30px;
+        }
+
+        .buttons button {
+            padding: 10px 20px;
+            margin: 0 10px;
+            font-size: 16px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        #yes {
+            background-color: #ff69b4;
+            color: white;
+        }
+
+        #no {
+            background-color: white;
+            color: #ff69b4;
+        }
+    </style>
+</head>
+
+<body>
+    <audio id="yesSound" src="https://sf5-hl-cdn-tos.douyinstatic.com/obj/ies-music/7108171180007377695.mp3" loop></audio>
+    <div class="container">
+        <img id="mainImage" src="https://dy.dw0.cn/uploads2/20250222/da27336ca6c60e45b3c9d468f272ef22.jpg" alt="爱心">
+        <h1 id="question">愿意和我在一起吗？</h1>
+        <div class="buttons">
+            <button id="yes">可以</button>
+            <button id="no">拒绝</button>
+        </div>
+    </div>
+    <canvas id="c" class="c" style="position: fixed; top: 0; left: 0; z-index: -1;"></canvas>
+    <script>
+        // 图片数组
+        const images = [
+            'https://dy.dw0.cn/uploads2/20250222/f242e765e694a965afd78e365665d5ac.jpg',
+            'https://dy.dw0.cn/uploads2/20250222/078fc66a35e17b85e6411a7b87449a19.jpg',
+            'https://dy.dw0.cn/uploads2/20250222/cb08e30d2052ce5e69d9200ec8595a53.jpg',
+            'https://dy.dw0.cn/uploads2/20250222/69a54b27bd22f805e9629050c0372e3a.jpg',
+            'https://dy.dw0.cn/uploads2/20250222/dca8452ad4cff4a862d10fb1667bf3ff.jpg'
+        ];
+        // 同意后的文本
+        const yestext = '!!!喜欢你!! ( >᎑';
+        // 拒绝后的提示文本数组
+        const noTexts = ["再考虑一下嘛~", "别这么快拒绝我呀", "给我个机会嘛", "不要狠心拒绝我", "真的不想和我在一起吗？"];
+
+        // 获取元素
+        const canvas = document.getElementById("c");
+        const ctx = canvas.getContext("2d");
+        const yesSound = document.getElementById('yesSound');
+        const yesButton = document.getElementById('yes');
+        const noButton = document.getElementById('no');
+        const questionText = document.getElementById('question');
+        const mainImage = document.getElementById('mainImage');
+        let clickCount = 0;
+
+        // 初始化画布大小
+        function window_resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window_resize();
+        window.addEventListener('resize', window_resize);
+
+        // 爱心属性
+        const all_attribute = {
+            num: 10,
+            start_probability: 0.1,
+            size_min: 1,
+            size_max: 2,
+            size_add_min: 0.3,
+            size_add_max: 0.5,
+            opacity_min: 0.5,
+            opacity_max: 0.5,
+            opacity_prev_min: .003,
+            opacity_prev_max: .005,
+            light_min: 0,
+            light_max: 90
+        };
+
+        let style_color = Math.random() * 360;
+        let all_element = [];
+
+        // 绘制爱心
+        function arc_heart(x, y, z, m) {
+            y -= m * 10;
+            ctx.moveTo(x, y);
+            z *= 0.05;
+            ctx.bezierCurveTo(x, y - 3 * z, x - 5 * z, y - 15 * z, x - 25 * z, y - 15 * z);
+            ctx.bezierCurveTo(x - 55 * z, y - 15 * z, x - 55 * z, y + 22.5 * z, x - 55 * z, y + 22.5 * z);
+            ctx.bezierCurveTo(x - 55 * z, y + 40 * z, x - 35 * z, y + 62 * z, x, y + 80 * z);
+            ctx.bezierCurveTo(x + 35 * z, y + 62 * z, x + 55 * z, y + 40 * z, x + 55 * z, y + 22.5 * z);
+            ctx.bezierCurveTo(x + 55 * z, y + 22.5 * z, x + 55 * z, y - 15 * z, x + 25 * z, y - 15 * z);
+            ctx.bezierCurveTo(x + 10 * z, y - 15 * z, x, y - 3 * z, x, y);
+        }
+
+        // 随机数生成函数
+        function find_random(num_one, num_two) {
+            return Math.random() * (num_two - num_one) + num_one;
+        }
+
+        // 爱心对象
+        function ready_run() {
+            this.to_reset();
+        }
+
+        ready_run.prototype = {
+            to_reset: function () {
+                this.x = find_random(0, canvas.width);
+                this.y = find_random(0, canvas.height);
+                this.size = find_random(all_attribute.size_min, all_attribute.size_max);
+                this.size_change = find_random(all_attribute.size_add_min, all_attribute.size_add_max);
+                this.opacity = find_random(all_attribute.opacity_min, all_attribute.opacity_max);
+                this.opacity_change = find_random(all_attribute.opacity_prev_min, all_attribute.opacity_prev_max);
+                this.light = find_random(all_attribute.light_min, all_attribute.light_max);
+                this.color = 'hsl(330, 100%, 75%)';
+            },
+            to_step: function () {
+                this.opacity -= this.opacity_change;
+                this.size += this.size_change;
+                if (this.opacity <= 0) {
+                    this.to_reset();
+                    return false;
+                }
+                ctx.fillStyle = this.color;
+                ctx.globalAlpha = this.opacity;
+                ctx.beginPath();
+                arc_heart(this.x, this.y, this.size, this.size);
+                ctx.closePath();
+                ctx.fill();
+                ctx.globalAlpha = 1;
+            }
+        }
+
+        // 动画循环
+        function start() {
+            requestAnimationFrame(start);
+            style_color += 0.1;
+            ctx.fillStyle = 'hsl(' + style_color + ',100%,97%)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            if (all_element.length < all_attribute.num && Math.random() < all_attribute.start_probability) {
+                all_element.push(new ready_run());
+            }
+            all_element.forEach(function (line) {
+                line.to_step();
+            });
+        }
+        start();
+
+        // 点击拒绝按钮的处理函数
+        noButton.addEventListener('click', function () {
+            clickCount++;
+            // 随机生成按钮的新位置
+            const newX = find_random(0, window.innerWidth - noButton.offsetWidth);
+            const newY = find_random(0, window.innerHeight - noButton.offsetHeight);
+            noButton.style.position = 'absolute';
+            noButton.style.left = newX + 'px';
+            noButton.style.top = newY + 'px';
+
+            if (clickCount <= 5) {
+                noButton.textContent = noTexts[clickCount - 1];
+            }
+
+            if (clickCount >= 1) {
+                mainImage.src = images[clickCount - 1 >= images.length ? images.length - 1 : clickCount - 1];
+            }
+        });
+
+        // 点击同意按钮的处理函数
+        yesButton.addEventListener('click', function () {
+            yesSound.play();
+            questionText.textContent = yestext;
+            mainImage.src = images[4];
+            const newContent = `<img src="${images[4]}" alt="拥抱" class="yes-image">
+                                <div style="position: fixed; cursor: pointer; width: 2rem; height: 2rem; border: 2px solid #fff; border-radius: 50%; font-size: 0.7rem; line-height: 1.8rem; text-align: center; z-index: 999; opacity: 0.7; background-color: rgba(0,0,0,.3); bottom: 50px; right: 20px;">
+                                    <a href="//5.dw0.cn" style="color:#fff;text-decoration:none;">
+                                        <span>更多</span>
+                                    </a>
+                                </div>`;
+            document.body.innerHTML = newContent;
+            document.body.style.overflow = 'hidden';
+        });
+    </script>
+</body>
+
+</html>
